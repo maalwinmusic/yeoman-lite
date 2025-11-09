@@ -17,6 +17,7 @@ program
   .argument("[output]", "Output path (relative or absolute)")
   .requiredOption("-n, --name <name>", "Component or file name")
   .option("--nowrapper", "Don't wrap the template in a folder named after the component")
+  .option("--templateDir <path>", "Optional custom template directory to search first")
   .parse(process.argv);
 
 const cwd = process.cwd();
@@ -25,6 +26,7 @@ let config: Partial<{
   template: string;
   output: string;
   nowrapper: boolean;
+  templateDir: string;
 }> = {};
 
 if (fs.existsSync(configPath)) {
@@ -39,12 +41,17 @@ if (fs.existsSync(configPath)) {
 }
 
 const [argTemplate, argOutput] = program.args;
-const { name, nowrapper } = program.opts<{ name: string; nowrapper?: boolean }>();
+const { name, nowrapper, templateDir } = program.opts<{
+  name: string;
+  nowrapper?: boolean;
+  templateDir?: string;
+}>();
 
 // Prefer CLI arguments over config file
 const template = argTemplate ?? config.template;
 const outputPath = argOutput ?? config.output;
 const useNoWrapper = nowrapper ?? config.nowrapper ?? false;
+const customTemplateDir = templateDir ?? config.templateDir;
 
 if (!template || !outputPath) {
   console.error(
@@ -53,9 +60,24 @@ if (!template || !outputPath) {
   process.exit(1);
 }
 
-const templateDir = path.join(__dirname, "../templates", template);
-if (!fs.existsSync(templateDir)) {
-  console.error(`❌ Template "${template}" not found.`);
+const defaultTemplateDir = path.join(__dirname, "../templates");
+const searchPaths = customTemplateDir
+  ? [path.resolve(cwd, customTemplateDir), defaultTemplateDir]
+  : [defaultTemplateDir];
+
+// Find first existing template
+let foundTemplateDir: string | null = null;
+for (const dir of searchPaths) {
+  const candidate = path.join(dir, template);
+  if (fs.existsSync(candidate)) {
+    foundTemplateDir = candidate;
+    break;
+  }
+}
+
+if (!foundTemplateDir) {
+  console.error(`❌ Template "${template}" not found in:`);
+  for (const dir of searchPaths) console.error(`   - ${dir}`);
   process.exit(1);
 }
 
@@ -101,5 +123,5 @@ function copyTemplate(src: string, dest: string, replacements: Record<string, st
   }
 }
 
-copyTemplate(templateDir, absOutputPath, replacements);
+copyTemplate(foundTemplateDir, absOutputPath, replacements);
 console.log(`✨ Done! Created "${name}" using template "${template}".`);
