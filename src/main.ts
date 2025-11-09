@@ -13,14 +13,45 @@ const program = new Command();
 program
   .name("yl")
   .description("Your personal scaffolding CLI")
-  .argument("<template>", "Template name (e.g. react-template)")
-  .argument("<output>", "Output path (relative or absolute)")
-  .requiredOption("--name <name>", "Component or file name")
+  .argument("[template]", "Template name (e.g. react-template)")
+  .argument("[output]", "Output path (relative or absolute)")
+  .requiredOption("-n, --name <name>", "Component or file name")
   .option("--nowrapper", "Don't wrap the template in a folder named after the component")
   .parse(process.argv);
 
-const [template, outputPath] = program.args;
+const cwd = process.cwd();
+const configPath = path.join(cwd, "ylconfig.json");
+let config: Partial<{
+  template: string;
+  output: string;
+  nowrapper: boolean;
+}> = {};
+
+if (fs.existsSync(configPath)) {
+  try {
+    const content = fs.readFileSync(configPath, "utf8");
+    config = JSON.parse(content);
+    console.log(`🧩 Using configuration from ylconfig.json`);
+  } catch (err) {
+    console.error(`⚠️ Failed to parse ylconfig.json: ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+
+const [argTemplate, argOutput] = program.args;
 const { name, nowrapper } = program.opts<{ name: string; nowrapper?: boolean }>();
+
+// Prefer CLI arguments over config file
+const template = argTemplate ?? config.template;
+const outputPath = argOutput ?? config.output;
+const useNoWrapper = nowrapper ?? config.nowrapper ?? false;
+
+if (!template || !outputPath) {
+  console.error(
+    `❌ Missing required arguments. Either pass <template> and <output> directly, or define them in ylconfig.json.`
+  );
+  process.exit(1);
+}
 
 const templateDir = path.join(__dirname, "../templates", template);
 if (!fs.existsSync(templateDir)) {
@@ -28,9 +59,9 @@ if (!fs.existsSync(templateDir)) {
   process.exit(1);
 }
 
-const absOutputPath = nowrapper
-  ? path.resolve(process.cwd(), outputPath)
-  : path.resolve(process.cwd(), outputPath, name);
+const absOutputPath = useNoWrapper
+  ? path.resolve(cwd, outputPath)
+  : path.resolve(cwd, outputPath, name);
 
 fs.mkdirSync(absOutputPath, { recursive: true });
 
