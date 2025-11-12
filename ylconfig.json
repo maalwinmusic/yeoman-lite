@@ -1,0 +1,6 @@
+{
+  "template": "electron-renderer",
+  "output": "./dest",
+  "nowrapper": true,
+  "templateDir": "./.yl-templates"
+}

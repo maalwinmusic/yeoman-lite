@@ -13,24 +13,77 @@ const program = new Command();
 program
   .name("yl")
   .description("Your personal scaffolding CLI")
-  .argument("<template>", "Template name (e.g. react-template)")
-  .argument("<output>", "Output path (relative or absolute)")
-  .requiredOption("--name <name>", "Component or file name")
+  .argument("[template]", "Template name (e.g. react-template)")
+  .argument("[output]", "Output path (relative or absolute)")
+  .requiredOption("-n, --name <name>", "Component or file name")
   .option("--nowrapper", "Don't wrap the template in a folder named after the component")
+  .option("--templateDir <path>", "Optional custom template directory to search first")
   .parse(process.argv);
 
-const [template, outputPath] = program.args;
-const { name, nowrapper } = program.opts<{ name: string; nowrapper?: boolean }>();
+const cwd = process.cwd();
+const configPath = path.join(cwd, "ylconfig.json");
+let config: Partial<{
+  template: string;
+  output: string;
+  nowrapper: boolean;
+  templateDir: string;
+}> = {};
 
-const templateDir = path.join(__dirname, "../templates", template);
-if (!fs.existsSync(templateDir)) {
-  console.error(`❌ Template "${template}" not found.`);
+if (fs.existsSync(configPath)) {
+  try {
+    const content = fs.readFileSync(configPath, "utf8");
+    config = JSON.parse(content);
+    console.log(`🧩 Using configuration from ylconfig.json`);
+  } catch (err) {
+    console.error(`⚠️ Failed to parse ylconfig.json: ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+
+const [argTemplate, argOutput] = program.args;
+const { name, nowrapper, templateDir } = program.opts<{
+  name: string;
+  nowrapper?: boolean;
+  templateDir?: string;
+}>();
+
+// Prefer CLI arguments over config file
+const template = argTemplate ?? config.template;
+const outputPath = argOutput ?? config.output;
+const useNoWrapper = nowrapper ?? config.nowrapper ?? false;
+const customTemplateDir = templateDir ?? config.templateDir;
+
+if (!template || !outputPath) {
+  console.error(
+    `❌ Missing required arguments. Either pass <template> and <output> directly, or define them in ylconfig.json.`
+  );
   process.exit(1);
 }
 
-const absOutputPath = nowrapper
-  ? path.resolve(process.cwd(), outputPath)
-  : path.resolve(process.cwd(), outputPath, name);
+const defaultTemplateDir = path.join(__dirname, "../templates");
+const searchPaths = customTemplateDir
+  ? [path.resolve(cwd, customTemplateDir), defaultTemplateDir]
+  : [defaultTemplateDir];
+
+// Find first existing template
+let foundTemplateDir: string | null = null;
+for (const dir of searchPaths) {
+  const candidate = path.join(dir, template);
+  if (fs.existsSync(candidate)) {
+    foundTemplateDir = candidate;
+    break;
+  }
+}
+
+if (!foundTemplateDir) {
+  console.error(`❌ Template "${template}" not found in:`);
+  for (const dir of searchPaths) console.error(`   - ${dir}`);
+  process.exit(1);
+}
+
+const absOutputPath = useNoWrapper
+  ? path.resolve(cwd, outputPath)
+  : path.resolve(cwd, outputPath, name);
 
 fs.mkdirSync(absOutputPath, { recursive: true });
 const replacements = {
@@ -69,5 +122,5 @@ function copyTemplate(src: string, dest: string, replacements: Record<string, st
   }
 }
 
-copyTemplate(templateDir, absOutputPath, replacements);
+copyTemplate(foundTemplateDir, absOutputPath, replacements);
 console.log(`✨ Done! Created "${name}" using template "${template}".`);
