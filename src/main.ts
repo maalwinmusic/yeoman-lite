@@ -3,10 +3,12 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { program } from "commander";
+import { Command } from "commander";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const program = new Command();
 
 program
   .name("yl")
@@ -14,35 +16,40 @@ program
   .argument("<template>", "Template name (e.g. react-template)")
   .argument("<output>", "Output path (relative or absolute)")
   .requiredOption("--name <name>", "Component or file name")
-  .option("--nowrapper <bool>", "Should we wrap the template in a folder named __NAME__")
+  .option("--nowrapper", "Don't wrap the template in a folder named after the component")
   .parse(process.argv);
 
 const [template, outputPath] = program.args;
-const { name, nowrapper } = program.opts();
+const { name, nowrapper } = program.opts<{ name: string; nowrapper?: boolean }>();
 
-const templateDir = path.join(__dirname, "templates", template);
+const templateDir = path.join(__dirname, "../templates", template);
 if (!fs.existsSync(templateDir)) {
   console.error(`❌ Template "${template}" not found.`);
   process.exit(1);
 }
 
-const absOutputPath = nowrapper ? path.resolve(process.cwd(), outputPath) : path.resolve(process.cwd(), outputPath, name);
+const absOutputPath = nowrapper
+  ? path.resolve(process.cwd(), outputPath)
+  : path.resolve(process.cwd(), outputPath, name);
+
 fs.mkdirSync(absOutputPath, { recursive: true });
 const replacements = {
   NAME: name,
-  NAMEPASCAL: name.split('-').map(x => x.charAt(0).toUpperCase() + x.slice(1)).reduce((prev, cur) => prev+cur, ''),
+  NAMEPASCAL: name
+    .split("-")
+    .map((x) => x.charAt(0).toUpperCase() + x.slice(1))
+    .join(""),
   DATE: new Date().toLocaleDateString(),
 };
 
-function replacePlaceholders(str, replacements) {
-  let result = str;
-  for (const [key, value] of Object.entries(replacements)) {
-    result = result.replace(new RegExp(`__${key}__`, "g"), value);
-  }
-  return result;
+function replacePlaceholders(str: string, replacements: Record<string, string>): string {
+  return Object.entries(replacements).reduce(
+    (acc, [key, value]) => acc.replace(new RegExp(`__${key}__`, "g"), value),
+    str
+  );
 }
 
-function copyTemplate(src, dest, replacements) {
+function copyTemplate(src: string, dest: string, replacements: Record<string, string>) {
   const files = fs.readdirSync(src, { withFileTypes: true });
 
   for (const file of files) {
