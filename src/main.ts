@@ -129,7 +129,6 @@ function copyTemplate(
   }
 
   for (const file of files) {
-    // Skip modify.json everywhere, but only allowed at top level
     if (file.name === "modify.json") {
       if (!isTopLevel) {
         console.warn(`⚠️ Ignored nested modify.json at: ${src}`);
@@ -146,17 +145,6 @@ function copyTemplate(
       copyTemplate(srcPath, destPath, replacements, modify, modTargets, false);
       continue;
     }
-
-    // Handle "skip if we will modify later"
-    // if (modTargets) {
-    //   const shouldModify = modTargets.has(destName);
-    //   const existsAlready = fs.existsSync(destPath);
-
-    //   if (shouldModify && existsAlready) {
-    //     console.log(`↪️ Skipped writing ${destName} (will be modified)`);
-    //     continue;
-    //   }
-    // }
     if (modTargets && modTargets.has(destName)) {
       const existsAlready = fs.existsSync(destPath);
       if (existsAlready) {
