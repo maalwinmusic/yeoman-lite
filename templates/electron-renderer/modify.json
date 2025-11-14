@@ -1,0 +1,14 @@
+[
+  {
+    "file": "common/declarations/window.d.ts",
+    "action": "insertBefore",
+    "target": "declare global {",
+    "text": "import { __NAMEPASCAL__API } from \"../types/api/__NAME__-api\";"
+  },
+  {
+    "file": "common/declarations/window.d.ts",
+    "action": "insertAfter",
+    "target": "interface Window {",
+    "text": "    __NAMEPASCAL__API: __NAMEPASCAL__API;"
+  }
+]

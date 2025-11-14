@@ -105,7 +105,7 @@ function replacePlaceholders(str: string, replacements: Record<string, string>):
 
 function copyTemplate(src: string, dest: string, replacements: Record<string, string>) {
   const files = fs.readdirSync(src, { withFileTypes: true });
-
+  let modify: Modification[]|null = null;
   for (const file of files) {
     const srcPath = path.join(src, file.name);
     const destName = replacePlaceholders(file.name, replacements);
@@ -114,14 +114,86 @@ function copyTemplate(src: string, dest: string, replacements: Record<string, st
     if (file.isDirectory()) {
       fs.mkdirSync(destPath, { recursive: true });
       copyTemplate(srcPath, destPath, replacements);
-    } else {
+    } else if (file.name === "modify.json"){
+      const content = fs.readFileSync(srcPath, "utf8");
+      modify = JSON.parse(content) as Modification[];
+    }
+    else {
       const content = fs.readFileSync(srcPath, "utf8");
       const replaced = replacePlaceholders(content, replacements);
       fs.writeFileSync(destPath, replaced);
       console.log(`✅ ${destPath}`);
     }
   }
+  if (modify) {
+      applyModifications(dest, modify, replacements);
+  }
+}
+
+function applyModifications(
+  projectRoot: string,
+  modifications: Array<Modification>,
+  replacements: Record<string, string>
+) {
+  for (const mod of modifications) {
+    const targetPath = path.join(projectRoot, mod.file);
+
+    if (!fs.existsSync(targetPath)) {
+      console.warn(`⚠️ Modification skipped. File not found: ${targetPath}`);
+      continue;
+    }
+
+    let content = fs.readFileSync(targetPath, "utf8");
+    const replacedText = replacePlaceholders(mod.text, replacements);
+
+    switch (mod.action) {
+      case "insertAfter": {
+        if (!mod.target) throw new Error("insertAfter requires a target");
+        const idx = content.indexOf(mod.target);
+        if (idx === -1) {
+          console.warn(`⚠️ Target not found in ${mod.file}: "${mod.target}"`);
+          break;
+        }
+        const insertPos = content.indexOf("\n", idx) + 1;
+        content = content.slice(0, insertPos) + replacedText + "\n" + content.slice(insertPos);
+        break;
+      }
+
+      case "insertBefore": {
+        if (!mod.target) throw new Error("insertBefore requires a target");
+        const idx = content.indexOf(mod.target);
+        if (idx === -1) {
+          console.warn(`⚠️ Target not found in ${mod.file}: "${mod.target}"`);
+          break;
+        }
+        content = content.slice(0, idx) + replacedText + "\n" + content.slice(idx);
+        break;
+      }
+
+      case "append": {
+        content += "\n" + replacedText;
+        break;
+      }
+
+      case "replace": {
+        if (!mod.target) throw new Error("replace requires a target");
+        const regex = new RegExp(mod.target, "g");
+        content = content.replace(regex, replacedText);
+        break;
+      }
+    }
+
+    fs.writeFileSync(targetPath, content);
+    console.log(`✏️ Modified ${mod.file}`);
+  }
 }
 
 copyTemplate(foundTemplateDir, absOutputPath, replacements);
 console.log(`✨ Done! Created "${name}" using template "${template}".`);
+
+type Modification = {
+  file: string;
+  action: "insertAfter" | "insertBefore" | "append" | "replace";
+  target?: string;
+  text: string;
+};
