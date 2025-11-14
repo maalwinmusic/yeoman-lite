@@ -13,7 +13,12 @@
 * 🧠 Overrideable config via `ylconfig.json`
 * 🗂 Optional custom template directory
 * 📦 "No wrapper" mode (output files directly without NAME folder)
-* 🔧 Automatic file modifications via `modify.json`
+* ✏️ **Automatic modifications via `modify.json`**
+
+  * Modify or append content to files after scaffolding
+  * Avoid overwriting files that will be modified
+  * Supports actions: `insertAfter`, `insertBefore`, `append`, `replace`
+  * Top-level `modify.json` only (nested ones are ignored)
 
 ---
 
@@ -43,6 +48,9 @@ This will:
 * Load the template: `templates/react-component/`
 * Replace placeholders like `__NAME__`
 * Create: `./src/components/Header/`
+* Files from `templates/react-component` will be copied to `./src/components/Header/`
+* Placeholders like `__NAME__`, `__DATE__`, `__AUTHOR__` will be replaced
+* If a template file is listed in `modify.json` and exists, **it will not be overwritten** — modifications are applied instead
 
 ---
 
@@ -140,6 +148,15 @@ This allows templates to automatically update:
 * routing tables
 * Redux stores
 * component registries
+
+---
+
+## ⚠️ Important Notes
+
+* **Top-level only:** Any `modify.json` inside nested folders is ignored
+* Placeholders in file names and modification paths are replaced automatically
+* Supports multiple modification actions in one `modify.json`
+* Template files not listed in `modify.json` are written normally, overwriting existing files
 
 ---
 
