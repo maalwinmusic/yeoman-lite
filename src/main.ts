@@ -103,30 +103,78 @@ function replacePlaceholders(str: string, replacements: Record<string, string>):
   );
 }
 
-function copyTemplate(src: string, dest: string, replacements: Record<string, string>) {
+function copyTemplate(
+  src: string,
+  dest: string,
+  replacements: Record<string, string>,
+  modify: Modification[] | null = null,
+  modTargets: Set<string> | null = null,
+  isTopLevel: boolean = true
+) {
   const files = fs.readdirSync(src, { withFileTypes: true });
-  let modify: Modification[]|null = null;
+
+  // Only check for modify.json at TOP LEVEL
+  if (isTopLevel) {
+    const modifyJSON = files.find(f => f.name === "modify.json");
+
+    if (modifyJSON) {
+      modify = JSON.parse(
+        fs.readFileSync(path.join(src, modifyJSON.name), "utf8")
+      ) as Modification[];
+
+      modTargets = new Set(
+        modify.map(m => path.basename(replacePlaceholders(m.file, replacements)))
+      );
+    }
+  }
+
   for (const file of files) {
+    // Skip modify.json everywhere, but only allowed at top level
+    if (file.name === "modify.json") {
+      if (!isTopLevel) {
+        console.warn(`⚠️ Ignored nested modify.json at: ${src}`);
+      }
+      continue;
+    }
+
     const srcPath = path.join(src, file.name);
     const destName = replacePlaceholders(file.name, replacements);
     const destPath = path.join(dest, destName);
 
     if (file.isDirectory()) {
       fs.mkdirSync(destPath, { recursive: true });
-      copyTemplate(srcPath, destPath, replacements);
-    } else if (file.name === "modify.json"){
-      const content = fs.readFileSync(srcPath, "utf8");
-      modify = JSON.parse(content) as Modification[];
+      copyTemplate(srcPath, destPath, replacements, modify, modTargets, false);
+      continue;
     }
-    else {
-      const content = fs.readFileSync(srcPath, "utf8");
-      const replaced = replacePlaceholders(content, replacements);
-      fs.writeFileSync(destPath, replaced);
-      console.log(`✅ ${destPath}`);
+
+    // Handle "skip if we will modify later"
+    // if (modTargets) {
+    //   const shouldModify = modTargets.has(destName);
+    //   const existsAlready = fs.existsSync(destPath);
+
+    //   if (shouldModify && existsAlready) {
+    //     console.log(`↪️ Skipped writing ${destName} (will be modified)`);
+    //     continue;
+    //   }
+    // }
+    if (modTargets && modTargets.has(destName)) {
+      const existsAlready = fs.existsSync(destPath);
+      if (existsAlready) {
+        console.log(`↪️ Skipped writing ${destName} (will be modified)`);
+        continue;
+      }
     }
+
+    const content = fs.readFileSync(srcPath, "utf8");
+    const replaced = replacePlaceholders(content, replacements);
+
+    fs.writeFileSync(destPath, replaced);
+    console.log(`📄 Created: ${destPath}`);
   }
-  if (modify) {
-      applyModifications(dest, modify, replacements);
+
+  // Only apply modification at top level (once)
+  if (isTopLevel && modify) {
+    applyModifications(dest, modify, replacements);
   }
 }
 
