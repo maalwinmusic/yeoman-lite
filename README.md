@@ -1,36 +1,32 @@
 # 🛠️ yl – Your Lightweight File Generator
 
-**yl** is a global Node.js CLI tool that helps you quickly scaffold files and folders from templates — perfect for React components, configuration files, or any code structure you use repeatedly.
+**yl** is a global Node.js CLI tool for quickly scaffolding files and folders from customizable templates — perfect for React components, configs, utilities, or any structure you need repeatedly.
 
 ---
 
 ## 🚀 Features
 
-- ⚡ Instant scaffolding from reusable templates
-- 🌍 Global CLI – usable from any project
-- 🧩 Dynamic placeholders (**NAME**, **AUTHOR**, **DATE**, etc.)
-- 📁 Nested folder support (recursive copy)
-- 🧠 Simple config via CLI flags
+* ⚡ Instant scaffolding from reusable templates
+* 🌍 Global CLI – usable from any project
+* 🧩 Dynamic placeholders (NAME, NAMEPASCAL, DATE, FILEINDEX, etc.)
+* 📁 Full recursive folder copying
+* 🧠 Overrideable config via `ylconfig.json`
+* 🗂 Optional custom template directory
+* 📦 "No wrapper" mode (output files directly without NAME folder)
+* 🔧 Automatic file modifications via `modify.json`
 
 ---
 
 ## 📦 Installation
 
-First, clone the repo:
-
-\`\`\`bash
+```bash
 git clone https://github.com/yourusername/yl.git
 cd yl
 npm install
-\`\`\`
-
-Then link it globally:
-
-\`\`\`bash
 npm link
-\`\`\`
+```
 
-Now you can use it anywhere on your machine 🎉
+Now you can run `yl` from anywhere 🎉
 
 ---
 
@@ -38,179 +34,198 @@ Now you can use it anywhere on your machine 🎉
 
 ### Basic Example
 
-\`\`\`bash
+```bash
 yl react-component ./src/components --name Header
-\`\`\`
+```
 
 This will:
 
-- Copy everything from \`templates/react-component/\`
-- Replace every **NAME** placeholder with \`Header\`
-- Output the generated files to \`./src/components/Header/\`
+* Load the template: `templates/react-component/`
+* Replace placeholders like `__NAME__`
+* Create: `./src/components/Header/`
 
 ---
 
-### Full Example with Multiple Flags
+## 🔧 Config File Support (`ylconfig.json`)
 
-\`\`\`bash
-yl react-component ./src/components --name Button --author "Jane Doe" --type component
-\`\`\`
+You can skip CLI arguments by adding a config file in your project root:
 
-Inside your templates you can now use placeholders:
+```json
+{
+  "template": "react-component",
+  "output": "./src/components",
+  "nowrapper": false,
+  "templateDir": "./custom-templates"
+}
+```
 
-\`\`\`tsx
-// **NAME**.tsx
-// Author: **AUTHOR**
-// Type: **TYPE**
-\`\`\`
-
-Result:
-
-\`\`\`tsx
-// Button.tsx
-// Author: Jane Doe
-// Type: component
-\`\`\`
+If a value is provided both via CLI and config, **CLI always wins**.
 
 ---
 
 ## 🏗 Template Structure
 
-Your templates live in the \`templates/\` folder, organized by type:
-
-\`\`\`
+```
 templates/
 └── react-component/
-├── **NAME**.tsx
-├── **NAME**.less
-├── **NAME**.spec.js
-└── **NAME**.stories.tsx
-\`\`\`
+    ├── __NAME__.tsx
+    ├── __NAME__.less
+    ├── __NAME__.spec.js
+    ├── __NAME__.stories.tsx
+    └── modify.json  (optional)
+```
 
-You can add as many template types as you like — for example:
-
-\`\`\`
-templates/api-endpoint/
-templates/hook/
-templates/context/
-\`\`\`
+You may add **any number of template types**, including nested folders.
 
 ---
 
-## 🧩 Placeholders
+## 🧩 Available Placeholders
 
-Anywhere in your file names or contents, you can use placeholders wrapped in double underscores:
+| Placeholder      | Description                                      |
+| ---------------- | ------------------------------------------------ |
+| `__NAME__`       | Raw name from `--name`                           |
+| `__NAMEPASCAL__` | Name converted to PascalCase                     |
+| `__DATE__`       | Local date string                                |
+| `__FILEINDEX__`  | Sequential number based on existing output files |
 
-| Placeholder        | Description                           | Example Result |
-| ------------------ | ------------------------------------- | -------------- |
-| \***\*NAME\*\***   | The name provided via \`--name\` flag | Header         |
-| \***\*AUTHOR\*\*** | Author name (optional)                | John Doe       |
-| \***\*DATE\*\***   | Date of generation                    | 31/10/2025     |
-| \***\*TYPE\*\***   | Optional custom field                 | component      |
+Example: `my-button` → `MyButton` via `NAMEPASCAL`.
 
 ---
 
-## 📁 Output Example
+## 📁 Optional: "No Wrapper" Mode
 
-Running:
+Usually templates output into:
 
-\`\`\`bash
-yl react-component ./src/components --name Header
-\`\`\`
+```
+/output/NAME/
+```
 
-Creates:
+But if you run:
 
-\`\`\`
+```bash
+yl react-component ./src --name Header --nowrapper
+```
+
+Your files go **directly into `src/`**.
+
+---
+
+## 🛠 Modifications via `modify.json`
+
+Templates can include a `modify.json` file to patch *existing* project files after generation.
+
+Example `modify.json`:
+
+```json
+[
+  {
+    "file": "index.ts",
+    "action": "insertAfter",
+    "target": "// IMPORTS",
+    "text": "import __NAME__ from './__NAME__';"
+  }
+]
+```
+
+Supported actions:
+
+* `insertAfter`
+* `insertBefore`
+* `append`
+* `replace`
+
+This allows templates to automatically update:
+
+* barrels (`index.ts`)
+* routing tables
+* Redux stores
+* component registries
+
+---
+
+## 📁 Example Output
+
+```
 src/
 └── components/
-└── Header/
-├── Header.tsx
-├── Header.less
-├── Header.spec.js
-└── Header.stories.tsx
-\`\`\`
+    └── Header/
+        ├── Header.tsx
+        ├── Header.less
+        ├── Header.spec.js
+        └── Header.stories.tsx
+```
 
 ---
 
-## 🧠 How It Works
+## ⚙️ Custom Template Directory
 
-1. The CLI reads the selected template folder.
-2. It recursively copies all files and folders.
-3. It replaces all placeholder patterns (**NAME**, etc.) in:
-   - File names
-   - Folder names
-   - File contents
-4. It outputs the generated result into your chosen destination folder.
+You can store templates outside the repo:
 
----
+```bash
+yl comp ./src --name Box --templateDir ./my-templates
+```
 
-## ⚠️ Common Issues & Fixes
+The CLI will search:
 
-### ❌ Command not found: yl
-
-You need to link the tool globally first:
-
-\`\`\`bash
-npm link
-\`\`\`
-
-If you’ve done that and it still fails, try reinstalling Node’s global bin path:
-
-\`\`\`bash
-npm uninstall -g yl && npm link
-\`\`\`
+1. Custom folder (if provided)
+2. Default `/templates` directory
 
 ---
 
-### ❌ Permission denied (macOS/Linux)
+## ⚠️ Common Issues
 
-Make sure your script is executable:
+### "Command not found: yl"
 
-\`\`\`bash
-chmod +x main.js
-\`\`\`
+Run `npm link` again.
 
----
+### "Template not found"
 
-### ❌ “Template not found”
+Check the folder structure:
 
-Double-check your template folder structure:
-
-\`\`\`
+```
 templates/<template-name>/
-\`\`\`
+```
 
-…and that you’re spelling the <template-name> correctly in your CLI command.
+Check `templateDir` if using it.
+
+### Permission errors
+
+Ensure your entry script is executable:
+
+```bash
+chmod +x main.js
+```
 
 ---
 
 ## 🧱 Development
 
-Want to hack on it? Run it locally without linking:
+Run locally:
 
-\`\`\`bash
+```bash
 node main.js react-component ./output --name Test
-\`\`\`
+```
 
-Or watch for changes:
+Or auto‑reload with nodemon:
 
-\`\`\`bash
+```bash
 nodemon main.js react-component ./output --name Test
-\`\`\`
+```
 
 ---
 
-## 💡 Ideas for the Future
+## 💡 Future Ideas
 
-- Add interactive prompts (no flags needed)
-- Support config files per template (template.json)
-- Publish templates to npm for team sharing
-- Colorized console output
-- Live preview mode (generate → view → confirm)
+* Interactive mode (no flags needed)
+* Template configuration via `template.json`
+* Shared template packs on npm
+* Live preview before writing files
+* Better diffing for `modify.json`
 
 ---
 
 ## 📜 License
 
-MIT © 2025 MAALWINMUSIC  
+MIT © 2025 MAALWINMUSIC
+
 Contributions welcome! ❤️
