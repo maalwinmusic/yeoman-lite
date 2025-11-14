@@ -1,0 +1,35 @@
+@use '../mixins' as mix;
+@use '../theme' as theme;
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font-family: theme.$font-family;
+  color: theme.$color-text;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.card {
+  @include mix.card(600px, 200px);
+}
+
+#window-header {
+  @include mix.window-header();
+}
+.no-background {
+  background: none;
+}
+.close-btn {
+  border: none;
+  color: theme.$color-text;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  -webkit-app-region: no-drag;
+
+  &:hover {
+    color: theme.$color-close-hover;
+  }
+}
